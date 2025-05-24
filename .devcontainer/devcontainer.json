@@ -5,7 +5,21 @@
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
 	"features": {
-		"ghcr.io/devcontainers-extra/features/haskell:2": {}
+		"ghcr.io/devcontainers-extra/features/haskell:2": {
+			"globalPackages": [
+				"cabal-fmt",
+				"hlint"
+			]
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"haskell.haskell",
+				"justusadam.language-haskell",
+				"hoovercj.haskell-linter"
+			]
+		}
 	}
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
