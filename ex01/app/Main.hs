@@ -8,13 +8,14 @@ import System.IO (hPutStrLn, stderr)
 import Types (AppConfig (..))
 
 main :: IO ()
-main = do
+main =
+  do
   -- Parse command line arguments
   options <- parseSpiderOptions
   let config = getAppConfig options
 
   -- Print configuration
-  putStrLn $ "Starting spider with configuration:"
+  putStrLn "Starting spider with configuration:"
   putStrLn $ "  URL: " ++ cfgUrl config
   putStrLn $ "  Recursive: " ++ (if cfgRecursive config then "Yes" else "No")
   putStrLn $ "  Max depth: " ++ show (cfgLevel config)

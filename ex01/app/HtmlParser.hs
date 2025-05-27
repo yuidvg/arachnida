@@ -1,0 +1,79 @@
+module HtmlParser
+  ( extractImageUrls,
+    extractLinks,
+  )
+where
+
+import Control.Exception (SomeException, catch)
+import qualified Data.ByteString.Lazy.Char8 as L8
+import Data.List (isSuffixOf)
+import Network.HTTP.Conduit (simpleHttp)
+import Network.URI (parseURI, relativeTo)
+import System.IO (hPutStrLn, stderr)
+import Text.HTML.TagSoup (Tag (..), fromAttrib, parseTags)
+
+-- | Extract image URLs from a webpage that match the given extensions
+extractImageUrls :: String -> [String] -> IO [String]
+extractImageUrls url extensions = do
+  result <- catch (extractImageUrls' url extensions) handleException
+  case result of
+    Left err -> do
+      hPutStrLn stderr $ "Failed to extract images from " ++ url ++ ": " ++ err
+      return []
+    Right urls -> return urls
+  where
+    handleException :: SomeException -> IO (Either String [String])
+    handleException e = return $ Left $ show e
+
+-- | Internal function to extract image URLs
+extractImageUrls' :: String -> [String] -> IO (Either String [String])
+extractImageUrls' url extensions = do
+  html <- simpleHttp url
+  let tags = parseTags $ L8.unpack html
+      imgTags = [tag | tag@(TagOpen "img" _) <- tags]
+      imageUrls = [fromAttrib "src" tag | tag <- imgTags]
+      filteredUrls = filter (hasValidExtension extensions) imageUrls
+      absoluteUrls = map (makeAbsolute url) filteredUrls
+  return $ Right $ filter (not . null) absoluteUrls
+
+-- | Extract all links from a webpage for recursive crawling
+extractLinks :: String -> IO [String]
+extractLinks url = do
+  result <- catch (extractLinks' url) handleException
+  case result of
+    Left err -> do
+      hPutStrLn stderr $ "Failed to extract links from " ++ url ++ ": " ++ err
+      return []
+    Right urls -> return urls
+  where
+    handleException :: SomeException -> IO (Either String [String])
+    handleException e = return $ Left $ show e
+
+-- | Internal function to extract links
+extractLinks' :: String -> IO (Either String [String])
+extractLinks' url = do
+  html <- simpleHttp url
+  let tags = parseTags $ L8.unpack html
+      linkTags = [tag | tag@(TagOpen "a" _) <- tags]
+      linkUrls = [fromAttrib "href" tag | tag <- linkTags]
+      absoluteUrls = map (makeAbsolute url) linkUrls
+  return $ Right $ filter (not . null) absoluteUrls
+
+-- | Check if a URL has a valid image extension
+hasValidExtension :: [String] -> String -> Bool
+hasValidExtension extensions urlStr =
+  any (`isSuffixOf` map toLower urlStr) (map (map toLower) extensions)
+  where
+    toLower c
+      | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
+      | otherwise = c
+
+-- | Convert relative URLs to absolute URLs
+makeAbsolute :: String -> String -> String
+makeAbsolute baseUrl relativeUrl
+  | null relativeUrl = ""
+  | otherwise =
+      case (parseURI baseUrl, parseURI relativeUrl) of
+        (Just base, Just relative) -> show $ relative `relativeTo` base
+        (Just _, Nothing) -> baseUrl ++ "/" ++ relativeUrl
+        _ -> relativeUrl

@@ -9,4 +9,4 @@
 *.tiff
 *.tif
 *.heic
-dist-newstyle/
+ex01/dist-newstyle/

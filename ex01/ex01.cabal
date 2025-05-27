@@ -12,10 +12,6 @@ cabal-version:      2.4
 --
 name:               spider
 
--- The package version.
--- See the Haskell package versioning policy (PVP) for standards
--- guiding when and how versions should be incremented.
--- https://pvp.haskell.org
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
@@ -73,7 +69,7 @@ executable spider
     -- Base language which the package is written in.
     default-language: Haskell2010
 
-    ghc-options:      -Wall
+    ghc-options:    -Wall
                     -Wcompat
                     -Widentities
                     -Wincomplete-record-updates
