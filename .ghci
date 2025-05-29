@@ -1,0 +1,2 @@
+:set -XDuplicateRecordFields -XNoFieldSelectors -XOverloadedRecordDot
+:set +m
