@@ -1,33 +1,33 @@
 module Types
   ( AppConfig (..),
     SpiderOptions (..),
+    extensions,
   )
 where
 
 -- | Configuration for the spider application
 data AppConfig = AppConfig
   { -- | Starting URL to crawl
-    cfgUrl :: String,
-    -- | Whether to crawl recursively
-    cfgRecursive :: Bool,
+    url :: String,
     -- | Maximum depth level
-    cfgLevel :: Int,
+    level :: Int,
     -- | Directory to save downloaded images
-    cfgPath :: FilePath,
-    -- | Image file extensions to download
-    cfgExtensions :: [String]
+    path :: FilePath
   }
   deriving (Show, Eq)
 
 -- | Command line options for the spider
 data SpiderOptions = SpiderOptions
   { -- | URL to crawl
-    optUrl :: String,
+    url :: String,
     -- | Recursive flag
-    optRecursive :: Bool,
+    recursive :: Bool,
     -- | Maximum depth
-    optLevel :: Maybe Int,
+    level :: Maybe Int,
     -- | Download path
-    optPath :: Maybe String
+    path :: Maybe String
   }
   deriving (Show, Eq)
+
+extensions :: [String]
+extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp"]

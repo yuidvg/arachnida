@@ -4,6 +4,7 @@ module Args
   )
 where
 
+import Data.Maybe (fromMaybe)
 import Options.Applicative
 import Types (AppConfig (..), SpiderOptions (..))
 
@@ -28,23 +29,20 @@ spiderOptionsParser =
           <> help "URL to start crawling from"
       )
     <*> switch
-      ( long "recursive"
-          <> short 'r'
+      ( short 'r'
           <> help "Enable recursive crawling"
       )
     <*> optional
       ( option
           auto
-          ( long "level"
-              <> short 'l'
+          ( short 'l'
               <> metavar "N"
               <> help "Maximum depth level for recursive crawling (default: 5)"
           )
       )
     <*> optional
       ( strOption
-          ( long "path"
-              <> short 'p'
+          ( short 'p'
               <> metavar "PATH"
               <> help "Directory to save downloaded images (default: ./data/)"
           )
@@ -54,9 +52,7 @@ spiderOptionsParser =
 getAppConfig :: SpiderOptions -> AppConfig
 getAppConfig opts =
   AppConfig
-    { cfgUrl = optUrl opts,
-      cfgRecursive = optRecursive opts,
-      cfgLevel = maybe 5 id (optLevel opts),
-      cfgPath = maybe "./data/" id (optPath opts),
-      cfgExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
+    { url = opts.url,
+      level = if opts.recursive then fromMaybe 5 opts.level else,
+      path = fromMaybe "./data/" opts.path
     }

@@ -50,7 +50,6 @@ executable spider
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-
     -- Other library packages from which modules are imported.
     build-depends:    base >= 4.7 && < 5
                   , optparse-applicative
@@ -67,7 +66,11 @@ executable spider
     hs-source-dirs:   app
 
     -- Base language which the package is written in.
-    default-language: Haskell2010
+    default-language: GHC2021
+
+    default-extensions: DuplicateRecordFields
+                      , NoFieldSelectors
+                      , OverloadedRecordDot
 
     ghc-options:    -Wall
                     -Wcompat
