@@ -5,7 +5,8 @@ module HtmlParser
 where
 
 import Control.Exception (SomeException, catch)
-import qualified Data.ByteString.Lazy.Char8 as L8
+import Data.ByteString.Lazy.Char8 qualified as L8
+import Data.Char (isAsciiUpper)
 import Data.List (isSuffixOf)
 import Network.HTTP.Conduit (simpleHttp)
 import Network.URI (parseURI, relativeTo)
@@ -13,9 +14,9 @@ import System.IO (hPutStrLn, stderr)
 import Text.HTML.TagSoup (Tag (..), fromAttrib, parseTags)
 
 -- | Extract image URLs from a webpage that match the given extensions
-extractImageUrls :: String -> [String] -> IO [String]
-extractImageUrls url extensions = do
-  result <- catch (extractImageUrls' url extensions) handleException
+extractImageUrls :: [String] -> String -> IO [String]
+extractImageUrls extensions url = do
+  result <- catch (extractImageUrls' extensions url) handleException
   case result of
     Left err -> do
       hPutStrLn stderr $ "Failed to extract images from " ++ url ++ ": " ++ err
@@ -26,8 +27,8 @@ extractImageUrls url extensions = do
     handleException e = return $ Left $ show e
 
 -- | Internal function to extract image URLs
-extractImageUrls' :: String -> [String] -> IO (Either String [String])
-extractImageUrls' url extensions = do
+extractImageUrls' :: [String] -> String -> IO (Either String [String])
+extractImageUrls' extensions url = do
   html <- simpleHttp url
   let tags = parseTags $ L8.unpack html
       imgTags = [tag | tag@(TagOpen "img" _) <- tags]
@@ -62,10 +63,10 @@ extractLinks' url = do
 -- | Check if a URL has a valid image extension
 hasValidExtension :: [String] -> String -> Bool
 hasValidExtension extensions urlStr =
-  any (`isSuffixOf` map toLower urlStr) (map (map toLower) extensions)
+  any ((`isSuffixOf` map toLower urlStr) . map toLower) extensions
   where
     toLower c
-      | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
+      | isAsciiUpper c = toEnum (fromEnum c + 32)
       | otherwise = c
 
 -- | Convert relative URLs to absolute URLs

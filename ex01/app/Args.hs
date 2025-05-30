@@ -53,6 +53,6 @@ getAppConfig :: SpiderOptions -> AppConfig
 getAppConfig opts =
   AppConfig
     { url = opts.url,
-      level = if opts.recursive then fromMaybe 5 opts.level else,
+      level = if opts.recursive then fromMaybe 5 opts.level else 1,
       path = fromMaybe "./data/" opts.path
     }
