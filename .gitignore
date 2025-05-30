@@ -9,6 +9,6 @@
 *.tiff
 *.tif
 *.heic
-ex01/dist-newstyle/
+*/dist-newstyle/
 .vscode/dist-cabal-repl/
 *.log
