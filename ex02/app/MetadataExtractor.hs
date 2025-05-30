@@ -1,6 +1,7 @@
 module MetadataExtractor (extractMetadata) where
 
 import Data.ByteString qualified as BS
+import Data.Char (isAsciiUpper)
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import ExifParser (parseExifData)
@@ -147,5 +148,5 @@ extractRawMetadata bs =
 -- | Convert character to lowercase
 toLower :: Char -> Char
 toLower c
-  | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
+  | isAsciiUpper c = toEnum (fromEnum c + 32)
   | otherwise = c

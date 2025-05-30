@@ -10,10 +10,7 @@ import Types (ExifData (..))
 
 -- | Parse EXIF data from a ByteString
 parseExifData :: BS.ByteString -> Maybe ExifData
-parseExifData bs =
-  case findExifSegment bs of
-    Nothing -> Nothing
-    Just exifBytes -> parseExifSegment exifBytes
+parseExifData bs = parseExifSegment =<< findExifSegment bs
 
 -- | Find EXIF segment in JPEG file
 findExifSegment :: BS.ByteString -> Maybe BS.ByteString
@@ -98,7 +95,21 @@ emptyExifData =
       whiteBalance = Nothing,
       gpsLatitude = Nothing,
       gpsLongitude = Nothing,
-      gpsAltitude = Nothing
+      gpsAltitude = Nothing,
+      hostComputer = Nothing,
+      lensInfo = Nothing,
+      lensMake = Nothing,
+      lensModel = Nothing,
+      exposureProgram = Nothing,
+      meteringMode = Nothing,
+      sceneType = Nothing,
+      exposureMode = Nothing,
+      sceneCaptureType = Nothing,
+      focalLengthIn35mm = Nothing,
+      colorSpace = Nothing,
+      sensingMethod = Nothing,
+      exifImageWidth = Nothing,
+      exifImageHeight = Nothing
     }
 
 -- | IFD Entry
@@ -123,10 +134,52 @@ parseIFDEntry isBigEndian =
 updateExifData :: ExifData -> IFDEntry -> ExifData
 updateExifData exif entry =
   case entry.tag of
-    0x010F -> exif {make = Just $ T.pack "Camera Make"} -- Simplified for now
-    0x0110 -> exif {model = Just $ T.pack "Camera Model"}
-    0x0112 -> exif {orientation = Just $ fromIntegral entry.value}
+    -- Camera Information
+    0x010F -> exif {make = Just $ extractString entry} -- Make
+    0x0110 -> exif {model = Just $ extractString entry} -- Model
+    0x0131 -> exif {software = Just $ extractString entry} -- Software
+    0x013B -> exif {artist = Just $ extractString entry} -- Artist
+    0x8298 -> exif {copyright = Just $ extractString entry} -- Copyright
+    0x010C -> exif {hostComputer = Just $ extractString entry} -- Host Computer
+
+    -- Image Orientation and Resolution
+    0x0112 -> exif {orientation = Just $ fromIntegral entry.value} -- Orientation
+    0x011A -> exif {xResolution = Just $ fromIntegral entry.value / 65536} -- XResolution (rational)
+    0x011B -> exif {yResolution = Just $ fromIntegral entry.value / 65536} -- YResolution (rational)
+    0x0128 -> exif {resolutionUnit = Just $ fromIntegral entry.value} -- ResolutionUnit
+
+    -- Camera Settings
+    0x829A -> exif {exposureTime = Just $ fromIntegral entry.value / 65536} -- ExposureTime
+    0x829D -> exif {fNumber = Just $ fromIntegral entry.value / 65536} -- FNumber
+    0x8827 -> exif {iso = Just $ fromIntegral entry.value} -- ISO
+    0x920A -> exif {focalLength = Just $ fromIntegral entry.value / 65536} -- FocalLength
+    0x9209 -> exif {flash = Just $ fromIntegral entry.value} -- Flash
+    0xA403 -> exif {whiteBalance = Just $ fromIntegral entry.value} -- WhiteBalance
+    0x8822 -> exif {exposureProgram = Just $ extractString entry} -- Exposure Program
+    0x9207 -> exif {meteringMode = Just $ extractString entry} -- Metering Mode
+    0xA001 -> exif {colorSpace = Just $ extractString entry} -- Color Space
+    0xA217 -> exif {sensingMethod = Just $ extractString entry} -- Sensing Method
+    0xA002 -> exif {exifImageWidth = Just $ fromIntegral entry.value} -- EXIF Image Width
+    0xA003 -> exif {exifImageHeight = Just $ fromIntegral entry.value} -- EXIF Image Height
+    0xA405 -> exif {focalLengthIn35mm = Just $ fromIntegral entry.value} -- Focal Length in 35mm
+    0xA406 -> exif {sceneType = Just $ extractString entry} -- Scene Type
+    0xA402 -> exif {exposureMode = Just $ extractString entry} -- Exposure Mode
+    0xA409 -> exif {sceneCaptureType = Just $ extractString entry} -- Scene Capture Type
+
+    -- Lens Information
+    0xA432 -> exif {lensInfo = Just $ extractString entry} -- Lens Info
+    0xA433 -> exif {lensMake = Just $ extractString entry} -- Lens Make
+    0xA434 -> exif {lensModel = Just $ extractString entry} -- Lens Model
+
+    -- GPS Data (simplified - would need proper GPS IFD parsing)
+    0x8825 -> exif -- GPS IFD pointer (would need separate parsing)
+
+    -- Ignore unknown tags
     _ -> exif
+  where
+    -- Extract string from EXIF entry (simplified)
+    extractString :: IFDEntry -> T.Text
+    extractString _ = T.pack "Unknown" -- Placeholder - would need proper string extraction
 
 -- | Get Word16 with endianness
 getWord16 :: Bool -> Get Word16

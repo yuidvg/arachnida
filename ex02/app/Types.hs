@@ -26,7 +26,22 @@ data ExifData = ExifData
     whiteBalance :: Maybe Int,
     gpsLatitude :: Maybe Double,
     gpsLongitude :: Maybe Double,
-    gpsAltitude :: Maybe Double
+    gpsAltitude :: Maybe Double,
+    -- Additional iPhone-specific fields
+    hostComputer :: Maybe Text,
+    lensInfo :: Maybe Text,
+    lensMake :: Maybe Text,
+    lensModel :: Maybe Text,
+    exposureProgram :: Maybe Text,
+    meteringMode :: Maybe Text,
+    sceneType :: Maybe Text,
+    exposureMode :: Maybe Text,
+    sceneCaptureType :: Maybe Text,
+    focalLengthIn35mm :: Maybe Int,
+    colorSpace :: Maybe Text,
+    sensingMethod :: Maybe Text,
+    exifImageWidth :: Maybe Int,
+    exifImageHeight :: Maybe Int
   }
   deriving (Show, Eq)
 
@@ -50,7 +65,11 @@ data ImageMetadata = ImageMetadata
   deriving (Show, Eq)
 
 -- | Command line arguments
-data Args = Args
+newtype Args = Args
   { inputFiles :: [FilePath]
   }
   deriving (Show, Eq)
+
+-- | Supported image file extensions
+extensions :: [String]
+extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp"]

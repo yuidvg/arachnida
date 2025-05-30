@@ -4,7 +4,7 @@ import Args (parseArgs)
 import Control.Exception (SomeException, catch)
 import Core (processFiles)
 import System.Exit (exitFailure)
-import Types (Args (..))
+import Types (Args (..), extensions)
 
 -- | Main entry point
 main :: IO ()
@@ -18,8 +18,5 @@ main = do
       putStrLn "Usage: scorpion FILE1 [FILE2 ...]"
       putStrLn ""
       putStrLn "Supported file formats:"
-      putStrLn "  - JPEG (.jpg, .jpeg)"
-      putStrLn "  - PNG (.png)"
-      putStrLn "  - GIF (.gif)"
-      putStrLn "  - BMP (.bmp)"
+      mapM_ (\ext -> putStrLn $ "  - " ++ drop 1 ext ++ " (" ++ ext ++ ")") extensions
       exitFailure
