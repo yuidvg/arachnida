@@ -10,3 +10,5 @@
 *.tif
 *.heic
 ex01/dist-newstyle/
+.vscode/dist-cabal-repl/
+*.log
