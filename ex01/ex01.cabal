@@ -73,6 +73,8 @@ executable spider
                       , OverloadedRecordDot
 
     ghc-options:    -Wall
+                    -Werror
+                    -Wextra
                     -Wcompat
                     -Widentities
                     -Wincomplete-record-updates
