@@ -3,27 +3,19 @@
 {
 	"name": "Debian",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
-	"features": {
-		"ghcr.io/devcontainers-extra/features/haskell:2": {
-			"globalPackages": [
-				"cabal-fmt",
-				"hlint",
-				"ghci-dap",
-				"haskell-debug-adapter"
-			]
-		}
+	"build": {
+		"dockerfile": "Dockerfile"
 	},
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"haskell.haskell",
 				"justusadam.language-haskell",
-				"hoovercj.haskell-linter"
+				"hoovercj.haskell-linter",
+				"phoityne.phoityne-vscode"
 			]
 		}
-	},
-	"onCreateCommand": "apt-get install -y libgmp-dev libgmp10-dev libtinfo-dev libncurses5-dev libncurses-dev"
+	}
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
