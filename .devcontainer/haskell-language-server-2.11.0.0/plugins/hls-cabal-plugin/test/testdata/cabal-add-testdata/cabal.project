@@ -1,0 +1,6 @@
+packages: cabal-add-exe
+          cabal-add-lib
+          cabal-add-tests
+          cabal-add-bench
+          cabal-add-multitarget
+          cabal-add-packageYaml
