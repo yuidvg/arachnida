@@ -43,7 +43,7 @@ formatMetadata metadata =
       "  Format: " ++ T.unpack metadata.fileInfo.fileFormat
     ]
       ++ formatDimensions metadata.fileInfo.dimensions
-      ++ formatCreationDate metadata.fileInfo.creationDate
+      ++ formatCreationDate metadata.fileInfo.modificationDateTime
       ++ formatExifData metadata.exifData
       ++ formatRawMetadata metadata.rawMetadata
 
@@ -64,7 +64,7 @@ formatDimensions (Just (width, height)) =
 -- | Format creation date
 formatCreationDate :: Maybe UTCTime -> [String]
 formatCreationDate Nothing = []
-formatCreationDate (Just time) = ["  Creation Date: " ++ show time]
+formatCreationDate (Just time) = [" Modification Date: " ++ show time]
 
 -- | Format EXIF data
 formatExifData :: ExifData -> [String]
@@ -83,7 +83,7 @@ formatRawMetadata :: Map.Map T.Text T.Text -> [String]
 formatRawMetadata rawData
   | Map.null rawData = []
   | otherwise =
-      ["", "Raw Metadata:"]
+      ["", "Additional Metadata:"]
         ++ map formatRawField (Map.toList rawData)
 
 -- | Format individual raw metadata field

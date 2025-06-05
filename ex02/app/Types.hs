@@ -1,4 +1,11 @@
-module Types where
+module Types
+  ( Args (..),
+    extensions,
+    FileInfo (..),
+    ExifData,
+    ImageMetadata (..),
+  )
+where
 
 import Data.Map qualified as Map
 import Data.Text (Text)
@@ -20,7 +27,7 @@ data FileInfo = FileInfo
     fileSize :: Integer,
     fileFormat :: Text,
     dimensions :: Maybe (Int, Int), -- (width, height)
-    creationDate :: Maybe UTCTime
+    modificationDateTime :: Maybe UTCTime
   }
   deriving (Show, Eq)
 

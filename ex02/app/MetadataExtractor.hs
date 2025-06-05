@@ -37,7 +37,7 @@ extractMetadata filePath = do
                     fileSize = fileSize,
                     fileFormat = T.pack $ map toLower $ drop 1 $ takeExtension filePath,
                     dimensions = Just (getDynamicImageDimensions img),
-                    creationDate = Just modTime
+                    modificationDateTime = Just modTime
                   }
 
           -- Extract EXIF data
