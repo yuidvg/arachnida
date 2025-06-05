@@ -35,7 +35,6 @@ executable scorpion
   other-modules:
     Args
     Core
-    ExifParser
     MetadataExtractor
     Types
 
@@ -43,6 +42,7 @@ executable scorpion
   -- other-extensions:
   -- Other library packages from which modules are imported.
   build-depends:
+    JuicyPixels,
     base >=4.7 && <5,
     binary,
     bytestring,
@@ -60,6 +60,8 @@ executable scorpion
   default-language: GHC2021
   default-extensions:
     DuplicateRecordFields
+    GADTs
+    MonoLocalBinds
     NoFieldSelectors
     OverloadedRecordDot
 

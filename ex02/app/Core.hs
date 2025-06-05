@@ -4,9 +4,10 @@ import Control.Monad (forM_)
 import Data.Char (isAsciiUpper)
 import Data.Map qualified as Map
 import Data.Text qualified as T
+import Data.Time (UTCTime)
 import MetadataExtractor (extractMetadata)
 import System.FilePath (takeExtension)
-import Types (Args (..), ExifData (..), FileMetadata (..), ImageMetadata (..), extensions)
+import Types (Args (..), ExifData, FileInfo (..), ImageMetadata (..), extensions)
 
 -- | Process multiple image files
 processFiles :: Args -> IO ()
@@ -37,11 +38,12 @@ formatMetadata :: ImageMetadata -> String
 formatMetadata metadata =
   unlines $
     [ "File Information:",
-      "  Name: " ++ T.unpack metadata.fileMetadata.fileName,
-      "  Size: " ++ formatFileSize metadata.fileMetadata.fileSize,
-      "  Type: " ++ T.unpack metadata.fileMetadata.fileType
+      "  Name: " ++ T.unpack metadata.fileInfo.fileName,
+      "  Size: " ++ formatFileSize metadata.fileInfo.fileSize,
+      "  Format: " ++ T.unpack metadata.fileInfo.fileFormat
     ]
-      ++ formatDimensions metadata.fileMetadata.dimensions
+      ++ formatDimensions metadata.fileInfo.dimensions
+      ++ formatCreationDate metadata.fileInfo.creationDate
       ++ formatExifData metadata.exifData
       ++ formatRawMetadata metadata.rawMetadata
 
@@ -59,51 +61,22 @@ formatDimensions Nothing = []
 formatDimensions (Just (width, height)) =
   ["  Dimensions: " ++ show width ++ " x " ++ show height ++ " pixels"]
 
+-- | Format creation date
+formatCreationDate :: Maybe UTCTime -> [String]
+formatCreationDate Nothing = []
+formatCreationDate (Just time) = ["  Creation Date: " ++ show time]
+
 -- | Format EXIF data
-formatExifData :: Maybe ExifData -> [String]
-formatExifData Nothing = ["", "EXIF Data: Not available"]
-formatExifData (Just exif) =
-  ["", "EXIF Data:"]
-    ++ concatMap
-      formatExifField
-      [ ("Make", fmap T.unpack exif.make),
-        ("Model", fmap T.unpack exif.model),
-        ("Software", fmap T.unpack exif.software),
-        ("Host Computer", fmap T.unpack exif.hostComputer),
-        ("Artist", fmap T.unpack exif.artist),
-        ("Copyright", fmap T.unpack exif.copyright),
-        ("Orientation", fmap show exif.orientation),
-        ("X Resolution", fmap show exif.xResolution),
-        ("Y Resolution", fmap show exif.yResolution),
-        ("Resolution Unit", fmap show exif.resolutionUnit),
-        ("Exposure Time", fmap show exif.exposureTime),
-        ("F Number", fmap show exif.fNumber),
-        ("ISO", fmap show exif.iso),
-        ("Focal Length", fmap show exif.focalLength),
-        ("Focal Length (35mm)", fmap show exif.focalLengthIn35mm),
-        ("Flash", fmap show exif.flash),
-        ("White Balance", fmap show exif.whiteBalance),
-        ("Exposure Program", fmap T.unpack exif.exposureProgram),
-        ("Metering Mode", fmap T.unpack exif.meteringMode),
-        ("Scene Type", fmap T.unpack exif.sceneType),
-        ("Exposure Mode", fmap T.unpack exif.exposureMode),
-        ("Scene Capture Type", fmap T.unpack exif.sceneCaptureType),
-        ("Color Space", fmap T.unpack exif.colorSpace),
-        ("Sensing Method", fmap T.unpack exif.sensingMethod),
-        ("EXIF Image Width", fmap show exif.exifImageWidth),
-        ("EXIF Image Height", fmap show exif.exifImageHeight),
-        ("Lens Info", fmap T.unpack exif.lensInfo),
-        ("Lens Make", fmap T.unpack exif.lensMake),
-        ("Lens Model", fmap T.unpack exif.lensModel),
-        ("GPS Latitude", fmap show exif.gpsLatitude),
-        ("GPS Longitude", fmap show exif.gpsLongitude),
-        ("GPS Altitude", fmap show exif.gpsAltitude)
-      ]
+formatExifData :: ExifData -> [String]
+formatExifData exifMap
+  | Map.null exifMap = ["", "EXIF Data: Not available"]
+  | otherwise =
+      ["", "EXIF Data:"]
+        ++ map formatExifField (Map.toList exifMap)
 
 -- | Format individual EXIF field
-formatExifField :: (String, Maybe String) -> [String]
-formatExifField (_, Nothing) = []
-formatExifField (name, Just value) = ["  " ++ name ++ ": " ++ value]
+formatExifField :: (T.Text, T.Text) -> String
+formatExifField (name, value) = "  " ++ T.unpack name ++ ": " ++ T.unpack value
 
 -- | Format raw metadata
 formatRawMetadata :: Map.Map T.Text T.Text -> [String]

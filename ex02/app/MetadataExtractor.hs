@@ -1,13 +1,19 @@
+{-# LANGUAGE MonoLocalBinds #-}
+
 module MetadataExtractor (extractMetadata) where
 
-import Data.ByteString qualified as BS
+import Codec.Picture (DynamicImage (..), imageHeight, imageWidth, readImageWithMetadata)
+import Codec.Picture.Metadata (Elem (..), Keys (..), Metadatas, extractExifMetas)
+import Codec.Picture.Metadata qualified as Meta
+import Codec.Picture.Metadata.Exif (ExifData (..), ExifTag)
 import Data.Char (isAsciiUpper)
 import Data.Map qualified as Map
+import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
-import ExifParser (parseExifData)
-import System.Directory (doesFileExist, getFileSize)
+import Data.Text.Encoding qualified as TE
+import System.Directory (doesFileExist, getFileSize, getModificationTime)
 import System.FilePath (takeExtension, takeFileName)
-import Types (FileMetadata (..), ImageMetadata (..))
+import Types (FileInfo (..), ImageMetadata (..))
 
 -- | Extract metadata from an image file
 extractMetadata :: FilePath -> IO (Maybe ImageMetadata)
@@ -16,134 +22,112 @@ extractMetadata filePath = do
   if not exists
     then return Nothing
     else do
+      -- Get basic file information
       fileSize <- getFileSize filePath
-      fileContent <- BS.readFile filePath
+      modTime <- getModificationTime filePath
 
-      let fileMetadata =
-            FileMetadata
-              { fileName = T.pack $ takeFileName filePath,
-                fileSize = fileSize,
-                fileType = T.pack $ map toLower $ drop 1 $ takeExtension filePath,
-                dimensions = extractDimensions fileContent,
-                colorDepth = Nothing,
-                compression = Nothing
-              }
+      -- Try to read the image and extract metadata
+      result <- readImageWithMetadata filePath
+      case result of
+        Left _ -> return Nothing -- Failed to read image
+        Right (img, metadata) -> do
+          let fileInfo =
+                FileInfo
+                  { fileName = T.pack $ takeFileName filePath,
+                    fileSize = fileSize,
+                    fileFormat = T.pack $ map toLower $ drop 1 $ takeExtension filePath,
+                    dimensions = Just (getDynamicImageDimensions img),
+                    creationDate = Just modTime
+                  }
 
-      let exifData = parseExifData fileContent
-      let rawMetadata = extractRawMetadata fileContent
+          -- Extract EXIF data
+          let exifMetas = extractExifMetas metadata
+          let exifData = Map.fromList $ mapMaybe convertExifToText exifMetas
 
-      return $
-        Just
-          ImageMetadata
-            { fileMetadata = fileMetadata,
-              exifData = exifData,
-              rawMetadata = rawMetadata
-            }
+          -- Extract other metadata
+          let rawMeta = extractOtherMetadata metadata
 
--- | Extract image dimensions from file content
-extractDimensions :: BS.ByteString -> Maybe (Int, Int)
-extractDimensions bs
-  | isJPEG bs = extractJPEGDimensions bs
-  | isPNG bs = extractPNGDimensions bs
-  | isGIF bs = extractGIFDimensions bs
-  | isBMP bs = extractBMPDimensions bs
-  | otherwise = Nothing
+          return $
+            Just
+              ImageMetadata
+                { fileInfo = fileInfo,
+                  exifData = exifData,
+                  rawMetadata = rawMeta
+                }
 
--- | Check if file is JPEG
-isJPEG :: BS.ByteString -> Bool
-isJPEG bs = BS.length bs >= 2 && BS.take 2 bs == BS.pack [0xFF, 0xD8]
+-- | Get dimensions from DynamicImage
+getDynamicImageDimensions :: DynamicImage -> (Int, Int)
+getDynamicImageDimensions dynImg = case dynImg of
+  ImageY8 img -> (imageWidth img, imageHeight img)
+  ImageY16 img -> (imageWidth img, imageHeight img)
+  ImageY32 img -> (imageWidth img, imageHeight img)
+  ImageYF img -> (imageWidth img, imageHeight img)
+  ImageYA8 img -> (imageWidth img, imageHeight img)
+  ImageYA16 img -> (imageWidth img, imageHeight img)
+  ImageRGB8 img -> (imageWidth img, imageHeight img)
+  ImageRGB16 img -> (imageWidth img, imageHeight img)
+  ImageRGBF img -> (imageWidth img, imageHeight img)
+  ImageRGBA8 img -> (imageWidth img, imageHeight img)
+  ImageRGBA16 img -> (imageWidth img, imageHeight img)
+  ImageYCbCr8 img -> (imageWidth img, imageHeight img)
+  ImageCMYK8 img -> (imageWidth img, imageHeight img)
+  ImageCMYK16 img -> (imageWidth img, imageHeight img)
 
--- | Check if file is PNG
-isPNG :: BS.ByteString -> Bool
-isPNG bs = BS.length bs >= 8 && BS.take 8 bs == BS.pack [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+-- | Convert EXIF metadata to text representation
+convertExifToText :: (ExifTag, Codec.Picture.Metadata.Exif.ExifData) -> Maybe (T.Text, T.Text)
+convertExifToText (tag, exifVal) = case cleanTagName tag of
+  Nothing -> Nothing
+  Just tagName -> Just (tagName, cleanExifValue exifVal)
 
--- | Check if file is GIF
-isGIF :: BS.ByteString -> Bool
-isGIF bs =
-  BS.length bs >= 6
-    && ( BS.take 6 bs == BS.pack [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]
-           || BS.take 6 bs == BS.pack [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] -- GIF87a
-           -- GIF89a
-       )
+-- | Clean up tag names to be more readable
+cleanTagName :: ExifTag -> Maybe T.Text
+cleanTagName tag = case show tag of
+  "TagMake" -> Just $ T.pack "Make"
+  "TagModel" -> Just $ T.pack "Model"
+  "TagOrientation" -> Just $ T.pack "Orientation"
+  "TagFlash" -> Just $ T.pack "Flash"
+  "TagDateTime" -> Just $ T.pack "DateTime"
+  "TagDateTimeOriginal" -> Just $ T.pack "DateTimeOriginal"
+  "TagDateTimeDigitized" -> Just $ T.pack "DateTimeDigitized"
+  "TagExposureTime" -> Just $ T.pack "ExposureTime"
+  "TagFNumber" -> Just $ T.pack "FNumber"
+  "TagISOSpeedRatings" -> Just $ T.pack "ISO"
+  "TagFocalLength" -> Just $ T.pack "FocalLength"
+  "TagWhiteBalance" -> Just $ T.pack "WhiteBalance"
+  "TagExposureProgram" -> Just $ T.pack "ExposureProgram"
+  "TagMeteringMode" -> Just $ T.pack "MeteringMode"
+  "TagLightSource" -> Just $ T.pack "LightSource"
+  "TagColorSpace" -> Just $ T.pack "ColorSpace"
+  "TagPixelXDimension" -> Just $ T.pack "PixelXDimension"
+  "TagPixelYDimension" -> Just $ T.pack "PixelYDimension"
+  tagStr -> if "TagUnknown" `elem` words tagStr then Nothing else Just (T.pack tagStr)
 
--- | Check if file is BMP
-isBMP :: BS.ByteString -> Bool
-isBMP bs = BS.length bs >= 2 && BS.take 2 bs == BS.pack [0x42, 0x4D] -- "BM"
+-- | Clean up EXIF values to remove unnecessary prefixes and suffixes
+cleanExifValue :: Codec.Picture.Metadata.Exif.ExifData -> T.Text
+cleanExifValue exifVal = case exifVal of
+  ExifString str -> T.filter (/= '\NUL') $ TE.decodeUtf8 str
+  ExifShort val -> T.pack $ show val
+  ExifLong val -> T.pack $ show val
+  ExifRational num den -> T.pack $ show (fromIntegral num / fromIntegral den :: Double)
+  _ -> T.pack $ show exifVal
 
--- | Extract JPEG dimensions
-extractJPEGDimensions :: BS.ByteString -> Maybe (Int, Int)
-extractJPEGDimensions bs = findSOFMarker (BS.drop 2 bs)
+-- | Extract other metadata from JuicyPixels metadata
+extractOtherMetadata :: Metadatas -> Map.Map T.Text T.Text
+extractOtherMetadata = Meta.foldMap extractKeyValue
   where
-    findSOFMarker :: BS.ByteString -> Maybe (Int, Int)
-    findSOFMarker bytes
-      | BS.length bytes < 4 = Nothing
-      | BS.take 2 bytes == BS.pack [0xFF, 0xC0] -- SOF0 marker
-        =
-          if BS.length bytes >= 9
-            then
-              let height = fromIntegral (BS.index bytes 5) * 256 + fromIntegral (BS.index bytes 6)
-                  width = fromIntegral (BS.index bytes 7) * 256 + fromIntegral (BS.index bytes 8)
-               in Just (width, height)
-            else Nothing
-      | BS.head bytes == 0xFF -- Skip other markers
-        =
-          let markerLength =
-                if BS.length bytes >= 4
-                  then fromIntegral (BS.index bytes 2) * 256 + fromIntegral (BS.index bytes 3)
-                  else 0
-           in findSOFMarker (BS.drop (markerLength + 2) bytes)
-      | otherwise = Nothing
-
--- | Extract PNG dimensions
-extractPNGDimensions :: BS.ByteString -> Maybe (Int, Int)
-extractPNGDimensions bs
-  | BS.length bs >= 24 =
-      let width =
-            fromIntegral (BS.index bs 16) * 16777216
-              + fromIntegral (BS.index bs 17) * 65536
-              + fromIntegral (BS.index bs 18) * 256
-              + fromIntegral (BS.index bs 19)
-          height =
-            fromIntegral (BS.index bs 20) * 16777216
-              + fromIntegral (BS.index bs 21) * 65536
-              + fromIntegral (BS.index bs 22) * 256
-              + fromIntegral (BS.index bs 23)
-       in Just (width, height)
-  | otherwise = Nothing
-
--- | Extract GIF dimensions
-extractGIFDimensions :: BS.ByteString -> Maybe (Int, Int)
-extractGIFDimensions bs
-  | BS.length bs >= 10 =
-      let width = fromIntegral (BS.index bs 7) * 256 + fromIntegral (BS.index bs 6)
-          height = fromIntegral (BS.index bs 9) * 256 + fromIntegral (BS.index bs 8)
-       in Just (width, height)
-  | otherwise = Nothing
-
--- | Extract BMP dimensions
-extractBMPDimensions :: BS.ByteString -> Maybe (Int, Int)
-extractBMPDimensions bs
-  | BS.length bs >= 26 =
-      let width =
-            fromIntegral (BS.index bs 21) * 16777216
-              + fromIntegral (BS.index bs 20) * 65536
-              + fromIntegral (BS.index bs 19) * 256
-              + fromIntegral (BS.index bs 18)
-          height =
-            fromIntegral (BS.index bs 25) * 16777216
-              + fromIntegral (BS.index bs 24) * 65536
-              + fromIntegral (BS.index bs 23) * 256
-              + fromIntegral (BS.index bs 22)
-       in Just (width, height)
-  | otherwise = Nothing
-
--- | Extract raw metadata as key-value pairs
-extractRawMetadata :: BS.ByteString -> Map.Map T.Text T.Text
-extractRawMetadata bs =
-  Map.fromList
-    [ (T.pack "file_signature", T.pack $ show $ BS.take 8 bs),
-      (T.pack "file_size", T.pack $ show $ BS.length bs)
-    ]
+    extractKeyValue :: Elem Keys -> Map.Map T.Text T.Text
+    extractKeyValue (key :=> value) = case key of
+      DpiX -> Map.singleton (T.pack "DpiX") (T.pack $ show value)
+      DpiY -> Map.singleton (T.pack "DpiY") (T.pack $ show value)
+      Width -> Map.singleton (T.pack "Width") (T.pack $ show value)
+      Height -> Map.singleton (T.pack "Height") (T.pack $ show value)
+      Title -> Map.singleton (T.pack "Title") (T.pack value)
+      Description -> Map.singleton (T.pack "Description") (T.pack value)
+      Author -> Map.singleton (T.pack "Author") (T.pack value)
+      Copyright -> Map.singleton (T.pack "Copyright") (T.pack value)
+      Software -> Map.singleton (T.pack "Software") (T.pack value)
+      Comment -> Map.singleton (T.pack "Comment") (T.pack value)
+      _ -> Map.empty
 
 -- | Convert character to lowercase
 toLower :: Char -> Char
