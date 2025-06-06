@@ -38,14 +38,13 @@ formatMetadata :: ImageMetadata -> String
 formatMetadata metadata =
   unlines $
     [ "File Information:",
-      "  Name: " ++ T.unpack metadata.fileInfo.fileName,
-      "  Size: " ++ formatFileSize metadata.fileInfo.fileSize,
-      "  Format: " ++ T.unpack metadata.fileInfo.fileFormat
+      "  Name: " ++ T.unpack metadata.fileInfo.name,
+      "  Size: " ++ formatFileSize metadata.fileInfo.size,
+      "  Format: " ++ T.unpack metadata.fileInfo.format
     ]
       ++ formatDimensions metadata.fileInfo.dimensions
-      ++ formatCreationDate metadata.fileInfo.modificationDateTime
+      ++ formatCreationDate metadata.fileInfo.creationDateTime
       ++ formatExifData metadata.exifData
-      ++ formatRawMetadata metadata.rawMetadata
 
 -- | Format file size in human-readable format
 formatFileSize :: Integer -> String
@@ -56,15 +55,14 @@ formatFileSize size
   | otherwise = show (size `div` (1024 * 1024 * 1024)) ++ " GB"
 
 -- | Format image dimensions
-formatDimensions :: Maybe (Int, Int) -> [String]
-formatDimensions Nothing = []
-formatDimensions (Just (width, height)) =
+formatDimensions :: (Int, Int) -> [String]
+formatDimensions (width, height) =
   ["  Dimensions: " ++ show width ++ " x " ++ show height ++ " pixels"]
 
 -- | Format creation date
 formatCreationDate :: Maybe UTCTime -> [String]
-formatCreationDate Nothing = []
-formatCreationDate (Just time) = [" Modification Date: " ++ show time]
+formatCreationDate Nothing = ["  Creation Date: Not available"]
+formatCreationDate (Just time) = ["  Creation Date: " ++ show time]
 
 -- | Format EXIF data
 formatExifData :: ExifData -> [String]
@@ -77,18 +75,6 @@ formatExifData exifMap
 -- | Format individual EXIF field
 formatExifField :: (T.Text, T.Text) -> String
 formatExifField (name, value) = "  " ++ T.unpack name ++ ": " ++ T.unpack value
-
--- | Format raw metadata
-formatRawMetadata :: Map.Map T.Text T.Text -> [String]
-formatRawMetadata rawData
-  | Map.null rawData = []
-  | otherwise =
-      ["", "Additional Metadata:"]
-        ++ map formatRawField (Map.toList rawData)
-
--- | Format individual raw metadata field
-formatRawField :: (T.Text, T.Text) -> String
-formatRawField (key, value) = "  " ++ T.unpack key ++ ": " ++ T.unpack value
 
 -- | Convert character to lowercase
 toLower :: Char -> Char

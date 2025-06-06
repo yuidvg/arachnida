@@ -23,11 +23,11 @@ extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp"]
 
 -- | Basic file information
 data FileInfo = FileInfo
-  { fileName :: Text,
-    fileSize :: Integer,
-    fileFormat :: Text,
-    dimensions :: Maybe (Int, Int), -- (width, height)
-    modificationDateTime :: Maybe UTCTime
+  { name :: Text,
+    size :: Integer,
+    format :: Text,
+    dimensions :: (Int, Int),
+    creationDateTime :: Maybe UTCTime
   }
   deriving (Show, Eq)
 
@@ -37,7 +37,6 @@ type ExifData = Map.Map Text Text
 -- | Complete image metadata
 data ImageMetadata = ImageMetadata
   { fileInfo :: FileInfo,
-    exifData :: ExifData,
-    rawMetadata :: Map.Map Text Text -- Additional metadata
+    exifData :: ExifData
   }
   deriving (Show, Eq)
