@@ -16,7 +16,7 @@ crawl config = do
   -- Create download directory
   createDirectoryIfMissing True config.path
 
-  urls <- collectUrls config.url config.level 0
+  urls <- collectUrls config.url config.level 1
   let uniqueUrls = nubUrls urls
   imageUrls <- mapM (extractImageUrls extensions) uniqueUrls
   let uniqueImageUrls = nubUrls (concat imageUrls)

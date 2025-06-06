@@ -9,7 +9,7 @@ import Data.ByteString.Lazy.Char8 qualified as L8
 import Data.Char (isAsciiUpper)
 import Data.List (isSuffixOf)
 import Network.HTTP.Conduit (simpleHttp)
-import Network.URI (parseURI, relativeTo)
+import Network.URI (parseURI, parseURIReference, relativeTo)
 import System.IO (hPutStrLn, stderr)
 import Text.HTML.TagSoup (Tag (..), fromAttrib, parseTags)
 
@@ -69,39 +69,14 @@ hasValidExtension extensions urlStr =
       | isAsciiUpper c = toEnum (fromEnum c + 32)
       | otherwise = c
 
--- | Convert relative URLs to absolute URLs
+-- | Convert relative URLs to absolute URLs using Network.URI library
 makeAbsolute :: String -> String -> String
 makeAbsolute baseUrl relativeUrl
   | null relativeUrl = ""
-  | isAbsoluteUrl relativeUrl = relativeUrl
   | otherwise =
-      case (parseURI baseUrl, parseURI relativeUrl) of
-        (Just base, Just relative) -> show $ relative `relativeTo` base
-        (Just _, Nothing) ->
-          -- Handle relative URLs that parseURI can't parse
-          let baseDir = getBaseDirectory baseUrl
-           in baseDir ++ relativeUrl
-        _ -> relativeUrl
-  where
-    -- Check if URL is absolute (has scheme)
-    isAbsoluteUrl url = "http://" `startsWithStr` url || "https://" `startsWithStr` url
-
-    -- Get the directory part of a URL (remove filename if present)
-    getBaseDirectory url =
-      case reverse url of
-        [] -> url ++ "/"
-        ('/' : _) -> url -- Already ends with slash
-        _ ->
-          -- Check if the last part looks like a filename (has extension)
-          let lastPart = takeWhile (/= '/') (reverse url)
-           in if '.' `elem` lastPart
-                then -- Has extension, remove filename
-                  let withoutFile = reverse $ dropWhile (/= '/') (reverse url)
-                   in if null withoutFile then "/" else withoutFile
-                else -- No extension, add trailing slash
-                  url ++ "/"
-
-    -- Helper functions
-    startsWithStr [] _ = True
-    startsWithStr _ [] = False
-    startsWithStr (x : xs) (y : ys) = x == y && startsWithStr xs ys
+      case parseURI baseUrl of
+        Nothing -> ""
+        Just base ->
+          case parseURIReference relativeUrl of
+            Nothing -> ""
+            Just relative -> show $ relative `relativeTo` base
