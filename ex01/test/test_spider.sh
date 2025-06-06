@@ -3,7 +3,7 @@
 # Test runner for the spider program
 # This script tests the spider with various configurations
 
-SPIDER_EXECUTABLE="../app/spider"  # Adjust path as needed
+SPIDER_EXECUTABLE="cabal run spider --"  # Adjust path as needed
 TEST_URL="http://localhost:8000/index.html"
 OUTPUT_DIR="./spider_test_output"
 

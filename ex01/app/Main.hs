@@ -17,7 +17,7 @@ main =
     -- Print configuration
     putStrLn "Starting spider with configuration:"
     putStrLn $ "  URL: " ++ config.url
-    putStrLn $ "  Recursive: " ++ (if config.level > 1 then "Yes" else "No")
+    putStrLn $ "  Recursive: " ++ (if config.level > 0 then "Yes" else "No")
     putStrLn $ "  Max depth: " ++ show config.level
     putStrLn $ "  Save path: " ++ config.path
     putStrLn $ "  Extensions: " ++ show extensions
