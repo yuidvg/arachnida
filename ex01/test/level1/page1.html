@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Spider Test - Level 1 Page 1</title>
+</head>
+
+<body>
+	<h1>Spider Test - Level 1 Page 1</h1>
+
+	<!-- Navigation back -->
+	<nav>
+		<a href="../index.html">← Back to Root</a>
+	</nav>
+
+	<!-- Images with different extensions -->
+	<div class="images">
+		<h2>Level 1 Images</h2>
+		<img src="images/level1-photo1.jpg" alt="Level 1 JPG Photo 1" />
+		<img src="images/level1-photo2.jpeg" alt="Level 1 JPEG Photo 2" />
+		<img src="images/level1-icon.png" alt="Level 1 PNG Icon" />
+		<img src="images/level1-anim.gif" alt="Level 1 GIF Animation" />
+		<img src="images/level1-bitmap.bmp" alt="Level 1 BMP Bitmap" />
+		<!-- Relative path to root images -->
+		<img src="../images/root-image.jpg" alt="Reference to Root Image" />
+	</div>
+
+	<!-- Links to deeper levels -->
+	<div class="navigation">
+		<h2>Go Deeper - Level 2</h2>
+		<ul>
+			<li><a href="../level2/page1.html">Level 2 - Page 1</a></li>
+			<li><a href="../level2/gallery.html">Level 2 - Gallery</a></li>
+		</ul>
+	</div>
+
+	<!-- Cross-references within same level -->
+	<div class="same-level">
+		<h2>Same Level Pages</h2>
+		<ul>
+			<li><a href="page2.html">Level 1 - Page 2</a></li>
+			<li><a href="gallery.html">Level 1 - Gallery</a></li>
+		</ul>
+	</div>
+</body>
+
+</html>
