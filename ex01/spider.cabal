@@ -37,12 +37,14 @@ executable spider
     Core
     Downloader
     HtmlParser
+    Logger
     Types
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
   -- Other library packages from which modules are imported.
   build-depends:
+    async,
     base >=4.7 && <5,
     bytestring,
     containers,
@@ -52,8 +54,8 @@ executable spider
     http-conduit,
     network-uri,
     optparse-applicative,
+    stm,
     tagsoup,
-    async,
     text,
 
   -- Directories containing source files.

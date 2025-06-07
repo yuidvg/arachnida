@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Core
   ( crawl,
   )
@@ -7,35 +9,39 @@ import Control.Concurrent.Async
 import Data.List (nub)
 import Downloader
 import HtmlParser
+import Logger
 import Network.HTTP.Simple
 import System.Directory
-import System.IO
 import Types
 
--- | Main crawling function
+-- | Main crawling function with thread-safe logging
 crawl :: AppConfig -> IO ()
 crawl config = do
-  -- Create download directory
-  createDirectoryIfMissing True config.path
-  imageUrls <- collectImageUrls config.url config.level 0
-  let uniqueImageUrls = nubUrls imageUrls
-  mapConcurrently_
-    ( \imgUrl -> do
-        putStrLn ("  Downloading image: " ++ imgUrl)
-        downloadImage imgUrl config.path
-    )
-    uniqueImageUrls
+  logger <- newLogger
 
--- | Recursively collect image URLs up to specified depth
-collectImageUrls :: String -> Int -> Int -> IO [String]
-collectImageUrls url maxDepth currentDepth
+  -- Start background logging thread
+  withAsync (logPrinter logger) $ \_ -> do
+    -- Create download directory
+    createDirectoryIfMissing True config.path
+    imageUrls <- collectImageUrls config.url config.level 0 logger
+    let uniqueImageUrls = nubUrls imageUrls
+    mapConcurrently_
+      ( \imgUrl -> do
+          logMsg logger ("  Downloading image: " ++ imgUrl)
+          downloadImage logger imgUrl config.path
+      )
+      uniqueImageUrls
+
+-- | Recursively collect image URLs up to specified depth with thread-safe logging
+collectImageUrls :: String -> Int -> Int -> Logger -> IO [String]
+collectImageUrls url maxDepth currentDepth logger
   | currentDepth > maxDepth = return []
   | otherwise = do
-      putStrLn $ "Collecting image URLs from: " ++ url ++ " (depth " ++ show currentDepth ++ ")"
+      logMsg logger $ "Collecting image URLs from: " ++ url ++ " (depth " ++ show currentDepth ++ ")"
       requestResult <- safeHttpLBS url
       case requestResult of
         Left err -> do
-          hPutStrLn stderr $ "Failed to download page from " ++ url ++ ": " ++ err
+          logMsg logger $ "Failed to download page from " ++ url ++ ": " ++ err
           return []
         Right response -> do
           let html = getResponseBody response
@@ -45,7 +51,7 @@ collectImageUrls url maxDepth currentDepth
             else do
               let children = extractLinks url html
               let uniqueChildren = nubUrls children
-              imageUrlsInDescendants <- concat <$> mapConcurrently (\child -> collectImageUrls child maxDepth (currentDepth + 1)) uniqueChildren
+              imageUrlsInDescendants <- concat <$> mapConcurrently (\child -> collectImageUrls child maxDepth (currentDepth + 1) logger) uniqueChildren
               return (imageUrlsInCurrentPage ++ imageUrlsInDescendants)
 
 -- | Remove duplicate URLs after normalizing them

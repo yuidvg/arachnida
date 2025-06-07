@@ -7,17 +7,17 @@ where
 
 import Control.Exception (SomeException, catch)
 import Data.ByteString.Lazy as LBS
+import Logger
 import Network.HTTP.Simple
 import System.FilePath (takeFileName, (</>))
-import System.IO (hPutStrLn, stderr)
 
--- | Internal function to perform the actual download
-downloadImage :: String -> FilePath -> IO (Either String ())
-downloadImage url savePath = do
+-- | Download an image with thread-safe logging
+downloadImage :: Logger -> String -> FilePath -> IO (Either String ())
+downloadImage logger url savePath = do
   imageResponseResult <- safeHttpLBS url
   case imageResponseResult of
     Left err -> do
-      hPutStrLn stderr $ "Failed to download image from " ++ url ++ ": " ++ err
+      logMsg logger $ "Failed to download image from " ++ url ++ ": " ++ err
       return $ Left err
     Right response -> do
       let fileName = takeFileName url
@@ -25,10 +25,10 @@ downloadImage url savePath = do
       writeResult <- safeWriteFile filePath (getResponseBody response)
       case writeResult of
         Left err -> do
-          hPutStrLn stderr $ "Failed to write file " ++ filePath ++ ": " ++ err
+          logMsg logger $ "Failed to write file " ++ filePath ++ ": " ++ err
           return $ Left err
         Right _ -> do
-          putStrLn $ "  Saved: " ++ filePath
+          logMsg logger $ "  Saved: " ++ filePath
           return $ Right ()
 
 safeWriteFile :: FilePath -> LBS.ByteString -> IO (Either String ())
