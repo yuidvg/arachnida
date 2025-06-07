@@ -16,7 +16,9 @@ downloadImage :: String -> FilePath -> IO (Either String ())
 downloadImage url savePath = do
   imageResponseResult <- safeHttpLBS url
   case imageResponseResult of
-    Left err -> return $ Left err
+    Left err -> do
+      hPutStrLn stderr $ "Failed to download image from " ++ url ++ ": " ++ err
+      return $ Left err
     Right response -> do
       let fileName = takeFileName url
       let filePath = savePath </> fileName

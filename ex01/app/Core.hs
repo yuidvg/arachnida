@@ -1,18 +1,16 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Core
   ( crawl,
   )
 where
 
-import Control.Concurrent.Async (mapConcurrently_)
+import Control.Concurrent.Async
 import Data.List (nub)
 import Downloader
-import HtmlParser (extractImageUrls, extractLinks)
+import HtmlParser
 import Network.HTTP.Simple
-import System.Directory (createDirectoryIfMissing)
+import System.Directory
 import System.IO
-import Types (AppConfig (..), extensions)
+import Types
 
 -- | Main crawling function
 crawl :: AppConfig -> IO ()
@@ -47,7 +45,7 @@ collectImageUrls url maxDepth currentDepth
             else do
               let children = extractLinks url html
               let uniqueChildren = nubUrls children
-              imageUrlsInDescendants <- concat <$> mapM (\link -> collectImageUrls link maxDepth (currentDepth + 1)) uniqueChildren
+              imageUrlsInDescendants <- concat <$> mapConcurrently (\child -> collectImageUrls child maxDepth (currentDepth + 1)) uniqueChildren
               return (imageUrlsInCurrentPage ++ imageUrlsInDescendants)
 
 -- | Remove duplicate URLs after normalizing them
