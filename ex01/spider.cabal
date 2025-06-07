@@ -48,10 +48,12 @@ executable spider
     containers,
     directory,
     filepath,
+    http-client,
     http-conduit,
     network-uri,
     optparse-applicative,
     tagsoup,
+    async,
     text,
 
   -- Directories containing source files.

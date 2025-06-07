@@ -4,61 +4,30 @@ module HtmlParser
   )
 where
 
-import Control.Exception (SomeException, catch)
 import Data.ByteString.Lazy.Char8 qualified as L8
 import Data.Char (isAsciiUpper)
 import Data.List (isSuffixOf)
-import Network.HTTP.Conduit (simpleHttp)
 import Network.URI (parseURI, parseURIReference, relativeTo)
-import System.IO (hPutStrLn, stderr)
 import Text.HTML.TagSoup (Tag (..), fromAttrib, parseTags)
 
 -- | Extract image URLs from a webpage that match the given extensions
-extractImageUrls :: [String] -> String -> IO [String]
-extractImageUrls extensions url = do
-  result <- catch (extractImageUrls' extensions url) handleException
-  case result of
-    Left err -> do
-      hPutStrLn stderr $ "Failed to extract images from " ++ url ++ ": " ++ err
-      return []
-    Right urls -> return urls
+extractImageUrls :: [String] -> String -> L8.ByteString -> [String]
+extractImageUrls extensions baseUrl html =
+  filter (not . null) $ map (makeAbsolute baseUrl) filteredUrls
   where
-    handleException :: SomeException -> IO (Either String [String])
-    handleException e = return $ Left $ show e
-
--- | Internal function to extract image URLs
-extractImageUrls' :: [String] -> String -> IO (Either String [String])
-extractImageUrls' extensions url = do
-  html <- simpleHttp url
-  let tags = parseTags $ L8.unpack html
-      imgTags = [tag | tag@(TagOpen "img" _) <- tags]
-      imageUrls = [fromAttrib "src" tag | tag <- imgTags]
-      filteredUrls = filter (hasValidExtension extensions) imageUrls
-      absoluteUrls = map (makeAbsolute url) filteredUrls
-  return $ Right $ filter (not . null) absoluteUrls
+    filteredUrls = filter (hasValidExtension extensions) imageUrls
+    imageUrls = [fromAttrib "src" tag | tag <- imgTags]
+    imgTags = [tag | tag@(TagOpen "img" _) <- tags]
+    tags = parseTags $ L8.unpack html
 
 -- | Extract all links from a webpage for recursive crawling
-extractLinks :: String -> IO [String]
-extractLinks url = do
-  result <- catch (extractLinks' url) handleException
-  case result of
-    Left err -> do
-      hPutStrLn stderr $ "Failed to extract links from " ++ url ++ ": " ++ err
-      return []
-    Right urls -> return urls
+extractLinks :: String -> L8.ByteString -> [String]
+extractLinks baseUrl html =
+  filter (not . null) $ map (makeAbsolute baseUrl) linkUrls
   where
-    handleException :: SomeException -> IO (Either String [String])
-    handleException e = return $ Left $ show e
-
--- | Internal function to extract links
-extractLinks' :: String -> IO (Either String [String])
-extractLinks' url = do
-  html <- simpleHttp url
-  let tags = parseTags $ L8.unpack html
-      linkTags = [tag | tag@(TagOpen "a" _) <- tags]
-      linkUrls = [fromAttrib "href" tag | tag <- linkTags]
-      absoluteUrls = map (makeAbsolute url) linkUrls
-  return $ Right $ filter (not . null) absoluteUrls
+    linkUrls = [fromAttrib "href" tag | tag <- linkTags]
+    linkTags = [tag | tag@(TagOpen "a" _) <- tags]
+    tags = parseTags $ L8.unpack html
 
 -- | Check if a URL has a valid image extension
 hasValidExtension :: [String] -> String -> Bool
