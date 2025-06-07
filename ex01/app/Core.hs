@@ -15,31 +15,26 @@ crawl :: AppConfig -> IO ()
 crawl config = do
   -- Create download directory
   createDirectoryIfMissing True config.path
-
-  urls <- collectUrls config.url config.level 1
-  let uniqueUrls = nubUrls urls
-  imageUrls <- mapM (extractImageUrls extensions) uniqueUrls
-  let uniqueImageUrls = nubUrls (concat imageUrls)
-
-  -- download images
+  imageUrls <- collectImageUrls config.url config.level 0
+  let uniqueImageUrls = nubUrls imageUrls
   forM_ uniqueImageUrls $ \imgUrl ->
     putStrLn ("  Downloading image: " ++ imgUrl)
       >> downloadImage imgUrl config.path
 
--- | Recursively collect URLs up to specified depth
-collectUrls :: String -> Int -> Int -> IO [String]
-collectUrls url maxDepth currentDepth
+-- | Recursively collect image URLs up to specified depth
+collectImageUrls :: String -> Int -> Int -> IO [String]
+collectImageUrls url maxDepth currentDepth
   | currentDepth > maxDepth = return []
+  | currentDepth == maxDepth = do
+      putStrLn ("Collecting image URLs from: " ++ url ++ " (depth " ++ show currentDepth ++ ")")
+      extractImageUrls extensions url
   | otherwise = do
-      putStrLn $ "Collecting URLs from: " ++ url ++ " (depth " ++ show currentDepth ++ ")"
-      -- Get links from current page
+      putStrLn $ "Collecting image URLs from: " ++ url ++ " (depth " ++ show currentDepth ++ ")"
+      imageUrlsInCurrentPage <- extractImageUrls extensions url
       children <- extractLinks url
       let uniqueChildren = nubUrls children
-      -- Recursively collect from children
-      descendants <- concat <$> mapM (\link -> collectUrls link maxDepth (currentDepth + 1)) uniqueChildren
-      let uniqueDescendants = nubUrls descendants
-      -- Return current URL plus all descendants
-      return (url : uniqueDescendants)
+      imageUrlsInDescendants <- concat <$> mapM (\link -> collectImageUrls link maxDepth (currentDepth + 1)) uniqueChildren
+      return (imageUrlsInCurrentPage ++ imageUrlsInDescendants)
 
 -- | Remove duplicate URLs after normalizing them
 nubUrls :: [String] -> [String]
