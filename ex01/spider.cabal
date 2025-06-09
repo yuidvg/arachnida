@@ -55,6 +55,7 @@ executable spider
     network-uri,
     optparse-applicative,
     stm,
+    streaming,
     tagsoup,
     text,
 

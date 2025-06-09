@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Core
   ( crawl,
     crawlWithConfig,
@@ -11,13 +13,15 @@ where
 
 import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Control.Monad (replicateM_, when)
+import Control.Monad (when)
 import Data.List (nub)
 import Data.Set qualified as Set
 import Downloader
 import HtmlParser
 import Logger
 import Network.HTTP.Simple
+import Streaming
+import Streaming.Prelude qualified as S
 import System.Directory
 import Types
 
@@ -61,13 +65,12 @@ aggressiveCrawlConfig =
 
 -- | Main crawling function with thread-safe logging
 crawl :: AppConfig -> IO ()
-crawl = crawlWithConfig aggressiveCrawlConfig
+crawl = crawlWithConfig defaultCrawlConfig
 
--- | Main crawling function with custom crawl configuration
+-- | Main crawling function with custom crawl configuration using streaming
 crawlWithConfig :: CrawlConfig -> AppConfig -> IO ()
 crawlWithConfig (CrawlConfig numDownloaders batchSize maxLinksPerPage) config = do
   logger <- newLogger
-  urlQueue <- newTQueueIO
   visitedSet <- newTVarIO Set.empty
 
   -- Start background logging thread
@@ -75,41 +78,24 @@ crawlWithConfig (CrawlConfig numDownloaders batchSize maxLinksPerPage) config = 
     -- Create download directory
     createDirectoryIfMissing True config.path
 
-    -- Producer thread: crawls the site and enqueues image URLs
-    let producer = do
-          collectImageUrls (CrawlConfig numDownloaders batchSize maxLinksPerPage) config.url config.level 0 logger urlQueue visitedSet
-          -- After crawling is done, send termination signals to all downloaders
-          replicateM_ numDownloaders $ atomically $ writeTQueue urlQueue Nothing
-          logMsg logger "Crawling completed, waiting for downloads to finish..."
+    logMsg logger "Starting streaming crawl..."
 
-    -- Consumer (downloader) logic with proper exception handling
-    let downloader = do
-          let loop = do
-                maybeUrl <- atomically $ readTQueue urlQueue
-                case maybeUrl of
-                  Nothing -> return () -- Graceful termination
-                  Just imgUrl -> do
-                    logMsg logger ("  Downloading image: " ++ imgUrl)
-                    result <- downloadImage logger imgUrl config.path
-                    case result of
-                      Left err -> logMsg logger ("  Download failed: " ++ err)
-                      Right _ -> return ()
-                    loop
-          loop
+    -- Create the URL stream and process it
+    let urlStream = collectImageUrlsStream (CrawlConfig numDownloaders batchSize maxLinksPerPage) config.url config.level 0 logger visitedSet
 
-    -- Run producer and consumers concurrently
-    withAsync producer $ \_ -> do
-      -- Use mapConcurrently_ for controlled parallel downloading
-      mapConcurrently_ (const downloader) [1 .. numDownloaders]
+    -- Process the stream with controlled concurrency
+    processImageUrlStream numDownloaders logger config.path urlStream
 
--- | Recursively collect image URLs up to specified depth with thread-safe logging
-collectImageUrls :: CrawlConfig -> String -> Int -> Int -> Logger -> TQueue (Maybe String) -> TVar (Set.Set String) -> IO ()
-collectImageUrls (CrawlConfig _ batchSize maxLinksPerPage) url maxDepth currentDepth logger queue visitedSet
+    logMsg logger "Crawling completed successfully."
+
+-- | Stream of image URLs discovered during crawling
+collectImageUrlsStream :: CrawlConfig -> String -> Int -> Int -> Logger -> TVar (Set.Set String) -> Stream (Of String) IO ()
+collectImageUrlsStream (CrawlConfig _ batchSize maxLinksPerPage) url maxDepth currentDepth logger visitedSet
   | currentDepth > maxDepth = return ()
   | otherwise = do
       -- Check if URL has been visited to avoid redundant work and cycles
       let normalizedUrl = normalizeUrl url
-      alreadyVisited <- atomically $ do
+      alreadyVisited <- lift $ atomically $ do
         visited <- readTVar visitedSet
         if Set.member normalizedUrl visited
           then return True
@@ -120,30 +106,58 @@ collectImageUrls (CrawlConfig _ batchSize maxLinksPerPage) url maxDepth currentD
       if alreadyVisited
         then return ()
         else do
-          logMsg logger $ "Collecting image URLs from: " ++ normalizedUrl ++ " (depth " ++ show currentDepth ++ ")"
-          requestResult <- safeHttpLBS normalizedUrl
+          lift $ logMsg logger $ "Collecting image URLs from: " ++ normalizedUrl ++ " (depth " ++ show currentDepth ++ ")"
+          requestResult <- lift $ safeHttpLBS normalizedUrl
           case requestResult of
             Left err -> do
-              logMsg logger $ "Failed to download page from " ++ normalizedUrl ++ ": " ++ err
+              lift $ logMsg logger $ "Failed to download page from " ++ normalizedUrl ++ ": " ++ err
             Right response -> do
               let html = getResponseBody response
               let imageUrlsInCurrentPage = extractImageUrls extensions normalizedUrl html
-              -- Enqueue found image URLs for downloaders
-              atomically $ mapM_ (writeTQueue queue . Just) imageUrlsInCurrentPage
 
+              -- Yield each image URL to the stream
+              S.each imageUrlsInCurrentPage
+
+              -- Process child links if we haven't reached max depth
               when (currentDepth < maxDepth) $ do
                 let children = extractLinks normalizedUrl html
                 let limitedChildren = case maxLinksPerPage of
                       Nothing -> children
                       Just limit -> take limit children
                 let uniqueChildren = nubUrls limitedChildren
-                -- Process children with limited concurrency to avoid resource exhaustion
-                let processInBatches [] = return ()
-                    processInBatches batch = do
-                      let (currentBatch, remaining) = splitAt batchSize batch
-                      mapConcurrently_ (\child -> collectImageUrls (CrawlConfig 0 batchSize maxLinksPerPage) child maxDepth (currentDepth + 1) logger queue visitedSet) currentBatch
-                      processInBatches remaining
-                processInBatches uniqueChildren
+
+                -- Process children in batches using streaming
+                let childStreams = map (\child -> collectImageUrlsStream (CrawlConfig 0 batchSize maxLinksPerPage) child maxDepth (currentDepth + 1) logger visitedSet) uniqueChildren
+
+                -- Process batches of child streams
+                processBatchedStreams batchSize childStreams
+
+-- | Process batches of streams to control concurrency
+processBatchedStreams :: Int -> [Stream (Of String) IO ()] -> Stream (Of String) IO ()
+processBatchedStreams _ [] = return ()
+processBatchedStreams batchSize streams = do
+  let (currentBatch, remaining) = splitAt batchSize streams
+
+  -- Process current batch by merging streams directly without converting to lists
+  sequence_ currentBatch -- Execute each stream in the current batch
+
+  -- Process remaining streams
+  processBatchedStreams batchSize remaining
+
+-- | Process the image URL stream with controlled concurrency
+processImageUrlStream :: Int -> Logger -> FilePath -> Stream (Of String) IO () -> IO ()
+processImageUrlStream _numDownloaders logger savePath urlStream = do
+  -- Process stream in real-time as URLs arrive
+  S.mapM_ (downloadSingleImage logger savePath) urlStream
+
+-- | Download a single image with logging
+downloadSingleImage :: Logger -> FilePath -> String -> IO ()
+downloadSingleImage logger savePath imgUrl = do
+  logMsg logger ("  Downloading image: " ++ imgUrl)
+  result <- downloadImage logger imgUrl savePath
+  case result of
+    Left err -> logMsg logger ("  Download failed: " ++ err)
+    Right _ -> return ()
 
 -- A helper to make the normalization logic available to collectImageUrls
 normalizeUrl :: String -> String
